@@ -14,7 +14,7 @@ import { Paciente } from './../../../_model/paciente';
 import { FormGroup, FormControl } from '@angular/forms';
 import { Component, OnInit } from '@angular/core';
 import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { ActivatedRoute, Params, Router } from '@angular/router';
 
 @Component({
@@ -92,6 +92,8 @@ export class EspecialComponent implements OnInit {
     this.medicosFiltrados = this.myControlMedico.valueChanges.pipe(map(val => this.filtrarMedicos(val)));
   }
 
+  get f(){return this.form.controls};
+  
   initForm(){
     if(this.edicion){
      this.consultaService.listarPorId(this.id).subscribe(
@@ -214,8 +216,8 @@ export class EspecialComponent implements OnInit {
   aceptar() {
     let consulta = new Consulta();
     consulta.especialidad = this.form.value['especialidad'];//this.especialidadSeleccionada;
-    consulta.medico = this.form.value['medico'];// this.medicoSeleccionado;
-    consulta.paciente = this.form.value['paciente'];//this.pacienteSeleccionado;
+    consulta.medico = this.form.value['medico'];
+    consulta.paciente = this.form.value['paciente'];
     if(!this.edicion){
       var tzoffset = (this.form.value['fechaConsulta']).getTimezoneOffset() * 60000;
       var localISOTime = (new Date(Date.now() - tzoffset)).toISOString()
@@ -231,21 +233,20 @@ export class EspecialComponent implements OnInit {
     consultaListaExamenDTO.listaExamen = this.examenesSeleccionados;
     
     if(this.edicion){
-      this.consultaService.registrar(consultaListaExamenDTO).subscribe(() => {
-        this.snackBar.open("Se registró", "Aviso", { duration: 2000 });
-        this.router.navigate(['consulta']);
-        setTimeout(() => {
-          this.limpiarControles();
-        }, 2000);
+      this.consultaService.modificar(consultaListaExamenDTO).pipe(switchMap(() => {
+        return this.consultaService.listar();
+      })).subscribe(data => {
+        this.consultaService.consultaCambio.next(data);
+        this.consultaService.mensajeCambio.next("Se modificó");
       });
     }else{
-      this.consultaService.modificar(consultaListaExamenDTO).subscribe(() => {
-        this.snackBar.open("Se registró", "Aviso", { duration: 2000 });
-        this.router.navigate(['consulta']);
-        setTimeout(() => {
-          this.limpiarControles();
-        }, 2000);
+      this.consultaService.registrar(consultaListaExamenDTO).pipe(switchMap(() => {
+        return this.consultaService.listar();
+      })).subscribe(data => {
+        this.consultaService.consultaCambio.next(data);
+        this.consultaService.mensajeCambio.next("Se registró");
       });
+      this.router.navigate(['consulta']);
     }
   }
 
